@@ -63,7 +63,6 @@ hysteria2_add_user_handler() {
     done
 
     read -p "Enter the traffic limit (in GB): " traffic_limit_GB
-
     read -p "Enter the expiration days: " expiration_days
     
     local unlimited_arg=""
@@ -688,6 +687,9 @@ webpanel_handler() {
         echo -e "${cyan}3.${NC} Get WebPanel URL"
         echo -e "${cyan}4.${NC} Show API Token"
         echo -e "${yellow}5.${NC} Reset WebPanel Credentials"
+        echo -e "${yellow}6.${NC} Change Domain/Port"
+        echo -e "${yellow}7.${NC} Change Root Path"
+        echo -e "${yellow}8.${NC} Change Session Expiration"
         echo "0. Back"
         read -p "Choose an option: " option
 
@@ -784,6 +786,57 @@ webpanel_handler() {
                     fi
                 fi
                 ;;
+            6) 
+                if ! systemctl is-active --quiet hysteria-webpanel.service; then
+                     echo -e "${red}WebPanel service is not running. Cannot perform this action.${NC}"
+                else
+                    read -e -p "Enter new domain (leave blank to keep current): " new_domain
+                    read -e -p "Enter new port (leave blank to keep current): " new_port
+
+                    if [ -z "$new_domain" ] && [ -z "$new_port" ]; then
+                        echo -e "${yellow}No changes specified. Aborting.${NC}"
+                    else
+                        local cmd_args=()
+                        if [ -n "$new_domain" ]; then
+                             cmd_args+=("--domain" "$new_domain")
+                        fi
+                        if [ -n "$new_port" ]; then
+                             cmd_args+=("--port" "$new_port")
+                        fi
+                        echo "Attempting to change domain/port..."
+                        python3 "$CLI_PATH" change-webpanel-domain-port "${cmd_args[@]}"
+                    fi
+                fi
+                ;;
+            7) 
+                if ! systemctl is-active --quiet hysteria-webpanel.service; then
+                     echo -e "${red}WebPanel service is not running. Cannot perform this action.${NC}"
+                else
+                    read -e -p "Enter new root path (leave blank for random): " new_root_path
+                    local cmd_args=()
+                    if [ -n "$new_root_path" ]; then
+                        cmd_args+=("--path" "$new_root_path")
+                    fi
+                    echo "Attempting to change root path..."
+                    python3 "$CLI_PATH" change-webpanel-root "${cmd_args[@]}"
+                fi
+                ;;
+            8) 
+                if ! systemctl is-active --quiet hysteria-webpanel.service; then
+                     echo -e "${red}WebPanel service is not running. Cannot perform this action.${NC}"
+                else
+                    while true; do
+                        read -e -p "Enter new session expiration in minutes: " new_minutes
+                        if [[ "$new_minutes" =~ ^[0-9]+$ ]]; then
+                            break
+                        else
+                            echo -e "${red}Error:${NC} Please enter a valid number."
+                        fi
+                    done
+                    echo "Attempting to change session expiration..."
+                    python3 "$CLI_PATH" change-webpanel-exp --minutes "$new_minutes"
+                fi
+                ;;
             0)
                 break
                 ;;
@@ -872,23 +925,24 @@ geo_update_handler() {
 
 masquerade_handler() {
     while true; do
+        status=$(python3 $CLI_PATH masquerade -s)
+        
+        echo "--------------------------"
+        if [ "$status" == "Enabled" ]; then
+            echo -e "Masquerade Status: ${green}${status}${NC}"
+        else
+            echo -e "Masquerade Status: ${red}${status}${NC}"
+        fi
+        echo "--------------------------"
+
         echo -e "${cyan}1.${NC} Enable Masquerade"
-        echo -e "${red}2.${NC} Remove Masquerade"
+        echo -e "${cyan}2.${NC} Remove Masquerade"
         echo "0. Back"
         read -p "Choose an option: " option
 
         case $option in
             1)
-                if systemctl is-active --quiet hysteria-webpanel.service; then
-                    echo -e "${red}Error:${NC} Masquerade cannot be enabled because hysteria-webpanel.service is running."
-                else
-                    read -p "Enter the URL for rewriteHost: " url
-                    if [ -z "$url" ]; then
-                        echo "Error: URL cannot be empty. Please try again."
-                    else
-                        python3 $CLI_PATH masquerade -e "$url"
-                    fi
-                fi
+                python3 $CLI_PATH masquerade -e
                 ;;
             2)
                 python3 $CLI_PATH masquerade -r

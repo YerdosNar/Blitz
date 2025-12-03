@@ -23,8 +23,12 @@ install_caddy_if_needed() {
     echo -e "${yellow}Installing Caddy...${NC}"
     sudo apt update -y > /dev/null 2>&1
     sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl > /dev/null 2>&1
-    curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key | sudo tee /etc/apt/trusted.gpg.d/caddy-stable.asc > /dev/null 2>&1
-    echo "deb [signed-by=/etc/apt/trusted.gpg.d/caddy-stable.asc] https://dl.cloudsmith.io/public/caddy/stable/deb/ubuntu $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/caddy-stable.list > /dev/null 2>&1
+
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg > /dev/null 2>&1
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list > /dev/null 2>&1
+    chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+    chmod o+r /etc/apt/sources.list.d/caddy-stable.list
+
     sudo apt update -y > /dev/null 2>&1
     sudo apt install -y caddy
     if [ $? -ne 0 ]; then
@@ -136,7 +140,7 @@ start_service() {
     local aiohttp_listen_port="$DEFAULT_AIOHTTP_LISTEN_PORT"
 
     update_env_file "$domain" "$external_port" "$aiohttp_listen_address" "$aiohttp_listen_port"
-    source "$NORMALSUB_ENV_FILE" # To get SUBPATH for Caddyfile
+    source "$NORMALSUB_ENV_FILE" 
 
     update_caddy_file_normalsub "$HYSTERIA_DOMAIN" "$HYSTERIA_PORT" "$SUBPATH" "$AIOHTTP_LISTEN_ADDRESS" "$AIOHTTP_LISTEN_PORT"
     
@@ -153,7 +157,7 @@ start_service() {
 
     if systemctl is-active --quiet hysteria-normal-sub.service && systemctl is-active --quiet hysteria-caddy-normalsub.service; then
         echo -e "${green}Normalsub service setup completed.${NC}"
-        echo -e "${green}Access base URL: https://$HYSTERIA_DOMAIN:$HYSTERIA_PORT/$SUBPATH/sub/normal/{username}${NC}"
+        echo -e "${green}Access base URL: https://$HYSTERIA_DOMAIN:$HYSTERIA_PORT/$SUBPATH/{username}${NC}"
     else
         echo -e "${red}Normalsub setup completed, but one or more services failed to start.${NC}"
         systemctl status hysteria-normal-sub.service --no-pager
@@ -188,8 +192,8 @@ edit_subpath() {
         exit 1
     fi
 
-    if [[ ! "$new_path" =~ ^[a-zA-Z0-9]+$ ]]; then
-        echo -e "${red}Error: New subpath must contain only alphanumeric characters (a-z, A-Z, 0-9) and cannot be empty.${NC}"
+    if [[ ! "$new_path" =~ ^[a-zA-Z0-9]+(/[a-zA-Z0-9]+)*$ ]]; then
+        echo -e "${red}Error: Invalid subpath format. Must be alphanumeric segments separated by single slashes (e.g., 'path' or 'path/to/resource'). Cannot start/end with a slash or have consecutive slashes.${NC}"
         exit 1
     fi
 
@@ -220,7 +224,7 @@ edit_subpath() {
 
     if systemctl is-active --quiet hysteria-normal-sub.service && systemctl is-active --quiet hysteria-caddy-normalsub.service; then
         echo -e "${green}Services updated successfully.${NC}"
-        echo -e "${green}New access base URL: https://$HYSTERIA_DOMAIN:$HYSTERIA_PORT/$new_path/sub/normal/{username}${NC}"
+        echo -e "${green}New access base URL: https://$HYSTERIA_DOMAIN:$HYSTERIA_PORT/$new_path/{username}${NC}"
         echo -e "${cyan}Old subpath '$old_subpath' is no longer accessible.${NC}"
     else
         echo -e "${red}Error: One or more services failed to restart/reload. Please check logs.${NC}"

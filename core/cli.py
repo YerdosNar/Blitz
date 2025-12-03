@@ -400,21 +400,24 @@ def update_geo(country: str):
 
 @cli.command('masquerade')
 @click.option('--remove', '-r', is_flag=True, help="Remove 'masquerade' from config.json.")
-@click.option('--enable', '-e', metavar='<domain>', type=str, help="Enable 'masquerade' in config.json with the specified domain.")
-def masquerade(remove: bool, enable: str):
+@click.option('--enable', '-e', is_flag=True, help="Enable 'masquerade' in config.json.")
+@click.option('--status', '-s', is_flag=True, help="Get 'masquerade' status.")
+def masquerade(remove: bool, enable: bool, status: bool):
     '''Manage 'masquerade' in Hysteria2 configuration.'''
     try:
-        if not remove and not enable:
-            raise click.UsageError('Error: You must use either --remove or --enable')
-        if remove and enable:
-            raise click.UsageError('Error: You cannot use both --remove and --enable at the same time')
+        if sum([remove, enable, status]) != 1:
+            raise click.UsageError('Error: You must use exactly one of --remove, --enable, or --status.')
 
         if enable:
-            cli_api.enable_hysteria2_masquerade(enable)
-            click.echo('Masquerade enabled successfully.')
+            response = cli_api.enable_hysteria2_masquerade()
+            click.echo(response)
         elif remove:
-            cli_api.disable_hysteria2_masquerade()
-            click.echo('Masquerade disabled successfully.')
+            response = cli_api.disable_hysteria2_masquerade()
+            click.echo(response)
+        elif status:
+            response = cli_api.get_hysteria2_masquerade_status()
+            click.echo(response)
+            
     except Exception as e:
         click.echo(f'{e}', err=True)
 
@@ -586,8 +589,9 @@ def singbox(action: str, domain: str, port: int):
               help='Action to perform: start, stop, or edit_subpath')
 @click.option('--domain', '-d', required=False, help='Domain name for SSL (for start action)', type=str)
 @click.option('--port', '-p', required=False, help='Port number for NormalSub service (for start action)', type=int)
-@click.option('--subpath', '-sp', required=False, help='New subpath (alphanumeric, for edit_subpath action)', type=str)
+@click.option('--subpath', '-sp', required=False, help="New subpath (e.g., 'path' or 'path/to/resource', for edit_subpath action)", type=str)
 def normalsub(action: str, domain: str, port: int, subpath: str):
+    """Manage the NormalSub service."""
     try:
         if action == 'start':
             if not domain or not port:
@@ -716,6 +720,49 @@ def get_web_panel_services_status():
             print(f"hysteria-caddy.service: {'Active' if caddy_status else 'Inactive'}")
         else:
             click.echo('Error: Services status not available.')
+    except Exception as e:
+        click.echo(f'{e}', err=True)
+
+@cli.command('change-webpanel-exp')
+@click.option('--minutes', '-m', required=True, help='New session expiration time in minutes', type=int)
+def change_webpanel_exp(minutes: int):
+    """Changes the session expiration time for the WebPanel."""
+    try:
+        cli_api.change_webpanel_expiration(minutes)
+        click.echo(f'WebPanel session expiration successfully updated to {minutes} minutes.')
+        click.echo('WebPanel service has been restarted.')
+    except Exception as e:
+        click.echo(f'{e}', err=True)
+
+
+@cli.command('change-webpanel-root')
+@click.option('--path', '-p', required=False, help='New root path. If not provided, a random one will be generated.', type=str)
+def change_webpanel_root(path: str | None):
+    """Changes the root path for the WebPanel."""
+    try:
+        cli_api.change_webpanel_root_path(path)
+        click.echo(f'WebPanel root path updated successfully.')
+        new_url = cli_api.get_webpanel_url()
+        click.echo(f'New URL is accessible on: {new_url}')
+        click.echo('WebPanel and Caddy services have been restarted.')
+    except Exception as e:
+        click.echo(f'{e}', err=True)
+
+
+@cli.command('change-webpanel-domain-port')
+@click.option('--domain', '-d', required=False, help='New domain for WebPanel', type=str)
+@click.option('--port', '-p', required=False, help='New port for WebPanel', type=int)
+def change_webpanel_domain_port(domain: str | None, port: int | None):
+    """Changes the domain and/or port for the WebPanel."""
+    try:
+        if not domain and not port:
+            raise click.UsageError('Error: You must provide either --domain or --port, or both.')
+        
+        cli_api.change_webpanel_domain_port(domain, port)
+        click.echo(f'WebPanel domain/port configuration updated successfully.')
+        new_url = cli_api.get_webpanel_url()
+        click.echo(f'New URL is accessible on: {new_url}')
+        click.echo('Caddy service has been restarted.')
     except Exception as e:
         click.echo(f'{e}', err=True)
 

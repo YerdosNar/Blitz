@@ -1,13 +1,28 @@
-### 🌟 **[2.4.6] – Server-Side User Search & UI Improvements**
+## 🎉 **Release 2.4.10 — Better Upgrades, Cleaner UI & Support Link**
 
-*Released: 2025-11-09*
+*Released: 2025-11-28*
 
-#### ✨ **New Features**
+### 💖 **Donation & Support**
 
-* 🔍 **Server-Side Search:** Implemented backend search for users, improving performance for large user lists.
-* 👤 **Default On-Hold Status:** New users are now created with `On-hold` status by default.
+* 🆕 Added **“Support Us”** link in the sidebar
+* 💸 Introduced a **donation modal** to help support project development
 
-#### 🐞 **Fixes**
+---
 
-* ⛔ **CLI Fix:** Prevent unintended `creation_date` from being set in `add_user` command.
-* 🧩 **Web Fix:** Hide expiration days for users with `On-hold` status in the edit modal for clarity.
+### 🎨 **User Interface**
+
+* 🎨 Fixed **QR code type label colors** — now uses muted text for better readability
+* 🔍 Cleaned up **URI display** by commenting out broken `hysteria-server` service checks
+
+### 🔧 **Upgrade Improvements**
+
+* 📦 Enhanced **Caddy installation process**
+* 🔁 Added handling for **existing Caddy services** to prevent conflicts
+* 🔐 Updated **Caddy repo & GPG key management** for compatibility with new upstream changes
+
+---
+
+## 📦 **Dependency Updates**
+
+* ⬆️ Bumped **pydantic** → `2.12.5`
+* ⬆️ Bumped **fastapi** → `0.122.0`

@@ -5,6 +5,7 @@ from datetime import datetime
 import json
 from typing import Any, Optional
 from dotenv import dotenv_values
+import re
 
 import traffic
 
@@ -228,14 +229,17 @@ def check_hysteria2_obfs():
     result = subprocess.run(["python3", Command.MANAGE_OBFS.value, "--check"], check=True, capture_output=True, text=True)
     return result.stdout.strip()
 
-def enable_hysteria2_masquerade(domain: str):
+def enable_hysteria2_masquerade():
     '''Enables masquerade for Hysteria2.'''
-    run_cmd(['python3', Command.MASQUERADE_SCRIPT.value, '1', domain])
-
+    return run_cmd(['python3', Command.MASQUERADE_SCRIPT.value, '1'])
 
 def disable_hysteria2_masquerade():
     '''Disables masquerade for Hysteria2.'''
-    run_cmd(['python3', Command.MASQUERADE_SCRIPT.value, '2'])
+    return run_cmd(['python3', Command.MASQUERADE_SCRIPT.value, '2'])
+
+def get_hysteria2_masquerade_status():
+    '''Gets the current masquerade status for Hysteria2.'''
+    return run_cmd(['python3', Command.MASQUERADE_SCRIPT.value, 'status'])
 
 
 def get_hysteria2_config_file() -> dict[str, Any]:
@@ -661,8 +665,8 @@ def edit_normalsub_subpath(new_subpath: str):
     '''Edits the subpath for NormalSub service.'''
     if not new_subpath:
         raise InvalidInputError('Error: New subpath cannot be empty.')
-    if not new_subpath.isalnum():
-        raise InvalidInputError('Error: New subpath must contain only alphanumeric characters (a-z, A-Z, 0-9).')
+    if not re.match(r"^[a-zA-Z0-9]+(?:/[a-zA-Z0-9]+)*$", new_subpath):
+        raise InvalidInputError("Error: Invalid subpath format. Must be alphanumeric segments separated by single slashes (e.g., 'path' or 'path/to/resource').")
     
     run_cmd(['bash', Command.INSTALL_NORMALSUB.value, 'edit_subpath', new_subpath])
 
@@ -733,6 +737,31 @@ def get_webpanel_api_token() -> str | None:
     '''Gets the API token of WebPanel.'''
     return run_cmd(['bash', Command.SHELL_WEBPANEL.value, 'api-token'])
 
+def get_webpanel_env_config() -> dict[str, Any]:
+    '''Retrieves the current configuration for the WebPanel service from its .env file.'''
+    try:
+        if not os.path.exists(WEBPANEL_ENV_FILE):
+            return {}
+        
+        env_vars = dotenv_values(WEBPANEL_ENV_FILE)
+        config = {}
+
+        config['DOMAIN'] = env_vars.get('DOMAIN')
+        config['ROOT_PATH'] = env_vars.get('ROOT_PATH')
+        
+        port_val = env_vars.get('PORT')
+        if port_val and port_val.isdigit():
+            config['PORT'] = int(port_val)
+        
+        exp_val = env_vars.get('EXPIRATION_MINUTES')
+        if exp_val and exp_val.isdigit():
+            config['EXPIRATION_MINUTES'] = int(exp_val)
+            
+        return config
+    except Exception as e:
+        print(f"Error reading WebPanel .env file: {e}")
+        return {}
+
 def reset_webpanel_credentials(new_username: str | None = None, new_password: str | None = None):
     '''Resets the WebPanel admin username and/or password.'''
     if not new_username and not new_password:
@@ -743,6 +772,36 @@ def reset_webpanel_credentials(new_username: str | None = None, new_password: st
         cmd_args.extend(['-u', new_username])
     if new_password:
         cmd_args.extend(['-p', new_password])
+    
+    run_cmd(cmd_args)
+
+def change_webpanel_expiration(expiration_minutes: int):
+    '''Changes the session expiration time for the WebPanel.'''
+    if not expiration_minutes:
+        raise InvalidInputError('Error: Expiration minutes must be provided.')
+    run_cmd(
+        ['bash', Command.SHELL_WEBPANEL.value, 'changeexp', str(expiration_minutes)]
+    )
+
+
+def change_webpanel_root_path(root_path: str | None = None):
+    '''Changes the root path for the WebPanel. A new random path is generated if not provided.'''
+    cmd_args = ['bash', Command.SHELL_WEBPANEL.value, 'changeroot']
+    if root_path:
+        cmd_args.append(root_path)
+    run_cmd(cmd_args)
+
+
+def change_webpanel_domain_port(domain: str | None = None, port: int | None = None):
+    '''Changes the domain and/or port for the WebPanel.'''
+    if not domain and not port:
+        raise InvalidInputError('Error: At least a new domain or new port must be provided.')
+    
+    cmd_args = ['bash', Command.SHELL_WEBPANEL.value, 'changedomain']
+    if domain:
+        cmd_args.extend(['-d', domain])
+    if port:
+        cmd_args.extend(['-p', str(port)])
     
     run_cmd(cmd_args)
 
